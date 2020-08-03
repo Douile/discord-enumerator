@@ -59,20 +59,14 @@ struct Guild {
 
 #[derive(Serialize_repr, Deserialize_repr, PartialEq, Debug, Clone)]
 #[repr(u8)]
+#[allow(non_camel_case_types)]
 enum ChannelType {
-    #[!warn(non_camel_case_types)]
     GUILD_TEXT = 0,
-    #[!warn(non_camel_case_types)]
     DM = 1,
-    #[!warn(non_camel_case_types)]
     GUILD_VOICE = 2,
-    #[!warn(non_camel_case_types)]
     GROUP_DM = 3,
-    #[!warn(non_camel_case_types)]
     GUILD_CATEGORY = 4,
-    #[!warn(non_camel_case_types)]
     GUILD_NEWS = 5,
-    #[!warn(non_camel_case_types)]
     GUILD_STORE = 6
 }
 
