@@ -118,6 +118,15 @@ struct User {
     premium_type: Option<u32>,
     public_flags: Option<u32>
 }
+impl User {
+    fn empty() -> User {
+        User {
+            id: String::from("NONE"), username: String::from("NONE"), discriminator: String::from("NONE"),
+            avatar: None, bot: None, system: None, mfa_enabled: None, locale: None, verified: None,
+            email: None, flags: None, premium_type: None, public_flags: None
+         }
+    }
+}
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 struct GuildMember {
@@ -125,11 +134,19 @@ struct GuildMember {
     nick: Option<String>,
     roles: Vec<String>,
     joined_at: String,
-    premium_since: String,
+    premium_since: Option<String>,
     deaf: bool,
     mute: bool
 }
 
+impl GuildMember {
+    fn get_user(&self) -> User {
+        match &self.user {
+            Some(user) => user.clone(),
+            None => User::empty()
+        }
+    }
+}
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 struct Role {
@@ -267,8 +284,8 @@ impl std::error::Error for DiscordError {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut i: u8 = 0;
-    let mut token : String = String::from("");
-    let mut id : String = String::from("");
+    let mut token = String::from("");
+    let mut id = String::from("");
     for argument in env::args() {
         if i == 1 {
             token = argument;
@@ -285,7 +302,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if i < 3 {
         println!("Not enough args");
     } else {
-        let guild = fetch_guild(id.as_str().clone().to_string(), token.as_str().clone().to_string()).await?;
+        let guild = fetch_guild(&id, &token).await?;
         println!("{:#?}", guild);
         println!("{} [{}] {}", guild.name, guild.id, guild.region);
 
@@ -294,12 +311,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             roles.insert(role.clone().id, role);
         }
 
+        let mut members = HashMap::<String,GuildMember>::new();
+
         match guild.channels {
             Some(channels) => {
-                log_channels(channels, roles).await?;
+                log_channels(channels, roles, &token).await?;
             }
             None => {
-                log_channels(fetch_guild_channels(id, token).await?, roles).await?;
+                log_channels(fetch_guild_channels(&id, &token).await?, roles, &token).await?;
             }
         }
 
@@ -309,20 +328,42 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-async fn log_channels(channels: Vec<Channel>, roles: HashMap<String, Role>) -> Result<(), Box<dyn std::error::Error>> {
+async fn log_channels(channels: Vec<Channel>, roles: HashMap<String, Role>, token: &String) -> Result<(), Box<dyn std::error::Error>> {
+    let mut members = HashMap::<String, GuildMember>::new();
+
     println!("{} channels", channels.len());
     for channel in channels {
         println!("#{} [{}] - {:#?}", channel.name, channel.id, channel.topic);
         match channel.permission_overwrites {
             Some(permissions) => {
+                let guild_id: String = match channel.guild_id {
+                    Some(guild_id) => guild_id,
+                    None => String::from("None")
+                };
                 for permission in permissions {
                     match permission.r#type.as_str() {
                         "member" => {
-                            println!("\tUser[{}] Allow: {} Deny: {}", permission.id, permission.allow_new, permission.deny_new);
+                            match members.get(&permission.id) {
+                                Some(member) => println!("\tUser[{}.{}] Allow: {} Deny: {}", permission.clone().id, member.get_user().username, permission.allow_new, permission.deny_new),
+                                None => {
+                                    let result = fetch_guild_member(&guild_id, &permission.id, &token).await;
+                                    match result {
+                                        Ok(member) => {
+                                            members.insert(permission.clone().id, member.clone());
+                                            println!("\tUser[{}.{}] Allow: {} Deny: {}", permission.clone().id, member.get_user().username, permission.allow_new, permission.deny_new);
+                                        }
+                                        Err(e) => {
+                                            println!("Error fetching user: {:#?}", e);
+                                            println!("\tUser[{}] Allow: {} Deny: {}", permission.clone().id, permission.allow_new, permission.deny_new)
+                                        }
+                                    }
+                                }
+                            }
+
                         },
                         "role" => {
                             match roles.get(&permission.id) {
-                                Some(role) => println!("\tRole[{}] Allow: {} Deny: {}", role.name, permission.allow_new, permission.deny_new),
+                                Some(role) => println!("\tRole[{}.{}] Allow: {} Deny: {}", role.id, role.name, permission.allow_new, permission.deny_new),
                                 None => println!("\tRole[{}] Allow: {} Deny: {}", permission.id, permission.allow_new, permission.deny_new)
                             }
                         },
@@ -336,7 +377,7 @@ async fn log_channels(channels: Vec<Channel>, roles: HashMap<String, Role>) -> R
     Ok(())
 }
 
-async fn fetch_guild(guild_id: String, token: String) -> Result<Guild, Box<dyn std::error::Error>> {
+async fn fetch_guild(guild_id: &String, token: &String) -> Result<Guild, Box<dyn std::error::Error>> {
     let response = reqwest::Client::new()
         .get(format!("https://discord.com/api/v6/guilds/{}", guild_id).as_str())
         .header("Authorization", token)
@@ -352,7 +393,7 @@ async fn fetch_guild(guild_id: String, token: String) -> Result<Guild, Box<dyn s
     }
 }
 
-async fn fetch_guild_channels(guild_id: String, token: String) -> Result<Vec<Channel>, Box<dyn std::error::Error>> {
+async fn fetch_guild_channels(guild_id: &String, token: &String) -> Result<Vec<Channel>, Box<dyn std::error::Error>> {
     let response = reqwest::Client::new()
         .get(format!("https://discord.com/api/v6/guilds/{}/channels", guild_id).as_str())
         .header("Authorization", token)
@@ -368,7 +409,7 @@ async fn fetch_guild_channels(guild_id: String, token: String) -> Result<Vec<Cha
     }
 }
 
-async fn fetch_guild_member(guild_id: String, user_id: String, token: String) -> Result<GuildMember, Box<dyn std::error::Error>> {
+async fn fetch_guild_member(guild_id: &String, user_id: &String, token: &String) -> Result<GuildMember, Box<dyn std::error::Error>> {
     let response = reqwest::Client::new()
         .get(format!("https://discord.com/api/v6/guilds/{}/members/{}", guild_id, user_id).as_str())
         .header("Authorization", token)
