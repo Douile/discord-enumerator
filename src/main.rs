@@ -40,7 +40,7 @@ struct Guild {
     unavailable: Option<bool>,
     member_count: Option<u32>,
     voice_states: Option<Vec<VoiceState>>,
-    members: Option<Vec<User>>,
+    members: Option<Vec<GuildMember>>,
     channels: Option<Vec<Channel>>,
     presences: Option<Vec<Presence>>,
     max_presences: Option<u32>,
@@ -119,6 +119,18 @@ struct User {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+struct GuildMember {
+    user: Option<User>,
+    nick: Option<String>,
+    roles: Vec<String>,
+    joined_at: String,
+    premium_since: String,
+    deaf: bool,
+    mute: bool
+}
+
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 struct Role {
     id: String,
     name: String,
@@ -148,7 +160,7 @@ struct VoiceState {
     guild_id: Option<String>,
     channel_id: Option<String>,
     user_id: String,
-    member: Option<User>,
+    member: Option<GuildMember>,
     session_id: String,
     deaf: bool,
     mute: bool,
@@ -293,7 +305,7 @@ async fn log_channels(channels: Vec<Channel>, roles: HashMap<String, Role>) -> R
                                 None => println!("\tRole[{}] Allow: {} Deny: {}", permission.id, permission.allow_new, permission.deny_new)
                             }
                         },
-                        _ => println!("\tUnknown[{} ]Allow: {} Deny: {}", permission.id, permission.allow_new, permission.deny_new)
+                        _ => println!("\tUnknown[{}] Allow: {} Deny: {}", permission.id, permission.allow_new, permission.deny_new)
                     }
                 }
             }
