@@ -245,6 +245,24 @@ struct ClientStatus {
     web: Option<String>
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+struct DiscordError {
+    code: u32,
+    message: String
+}
+
+impl std::fmt::Display for DiscordError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DiscordError {}: {}", self.code, self.message)
+    }
+}
+
+impl std::error::Error for DiscordError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        None
+    }
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut i: u8 = 0;
@@ -298,7 +316,9 @@ async fn log_channels(channels: Vec<Channel>, roles: HashMap<String, Role>) -> R
             Some(permissions) => {
                 for permission in permissions {
                     match permission.r#type.as_str() {
-                        "member" => println!("\tUser[{}] Allow: {} Deny: {}", permission.id, permission.allow_new, permission.deny_new),
+                        "member" => {
+                            println!("\tUser[{}] Allow: {} Deny: {}", permission.id, permission.allow_new, permission.deny_new);
+                        },
                         "role" => {
                             match roles.get(&permission.id) {
                                 Some(role) => println!("\tRole[{}] Allow: {} Deny: {}", role.name, permission.allow_new, permission.deny_new),
@@ -321,13 +341,14 @@ async fn fetch_guild(guild_id: String, token: String) -> Result<Guild, Box<dyn s
         .header("Authorization", token)
         .send()
         .await?;
-    /*
-    let text = response.text().await?;
-    println!("{}", text);
-    Ok(())
-    */
-    let guild = response.json::<Guild>().await?;
-    Ok(guild)
+
+    if response.status().is_success() {
+        let guild = response.json::<Guild>().await?;
+        Ok(guild)
+    } else {
+        let err = response.json::<DiscordError>().await?;
+        Err(Box::new(err))
+    }
 }
 
 async fn fetch_guild_channels(guild_id: String, token: String) -> Result<Vec<Channel>, Box<dyn std::error::Error>> {
@@ -336,11 +357,28 @@ async fn fetch_guild_channels(guild_id: String, token: String) -> Result<Vec<Cha
         .header("Authorization", token)
         .send()
         .await?;
-    /*
-    let text = response.text().await?;
-    println!("{}", text);
-    let channels = Vec::<Channel>::new();
-    */
-    let channels = response.json::<Vec<Channel>>().await?;
-    Ok(channels)
+
+    if response.status().is_success() {
+        let channels = response.json::<Vec<Channel>>().await?;
+        Ok(channels)
+    } else {
+        let err = response.json::<DiscordError>().await?;
+        Err(Box::new(err))
+    }
+}
+
+async fn fetch_guild_member(guild_id: String, user_id: String, token: String) -> Result<GuildMember, Box<dyn std::error::Error>> {
+    let response = reqwest::Client::new()
+        .get(format!("https://discord.com/api/v6/guilds/{}/members/{}", guild_id, user_id).as_str())
+        .header("Authorization", token)
+        .send()
+        .await?;
+
+    if response.status().is_success() {
+        let user = response.json::<GuildMember>().await?;
+        Ok(user)
+    } else {
+        let err = response.json::<DiscordError>().await?;
+        Err(Box::new(err))
+    }
 }
