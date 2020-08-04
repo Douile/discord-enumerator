@@ -281,6 +281,8 @@ impl std::error::Error for DiscordError {
     }
 }
 
+static USER_AGENT: &'static str = "Reqwest/0.10 DiscordEnumerator/0.1";
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut i: u8 = 0;
@@ -381,6 +383,7 @@ async fn fetch_guild(guild_id: &String, token: &String) -> Result<Guild, Box<dyn
     let response = reqwest::Client::new()
         .get(format!("https://discord.com/api/v6/guilds/{}", guild_id).as_str())
         .header("Authorization", token)
+        .header("User-Agent", USER_AGENT)
         .send()
         .await?;
 
@@ -397,6 +400,7 @@ async fn fetch_guild_channels(guild_id: &String, token: &String) -> Result<Vec<C
     let response = reqwest::Client::new()
         .get(format!("https://discord.com/api/v6/guilds/{}/channels", guild_id).as_str())
         .header("Authorization", token)
+        .header("User-Agent", USER_AGENT)
         .send()
         .await?;
 
@@ -413,6 +417,7 @@ async fn fetch_guild_member(guild_id: &String, user_id: &String, token: &String)
     let response = reqwest::Client::new()
         .get(format!("https://discord.com/api/v6/guilds/{}/members/{}", guild_id, user_id).as_str())
         .header("Authorization", token)
+        .header("User-Agent", USER_AGENT)
         .send()
         .await?;
 
