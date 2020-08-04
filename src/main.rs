@@ -40,12 +40,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("Not enough args");
     } else {
         let guild = fetch_guild(&id, &token).await?;
-        println!("{:#?}", guild);
+        // println!("{:#?}", guild);
         println!("{} [{}] {}", guild.name, guild.id, guild.region);
 
         let mut roles = HashMap::<String, Role>::new();
-        for role in guild.roles {
-            roles.insert(role.clone().id, role);
+        for role in &guild.roles {
+            roles.insert(role.clone().id, role.clone());
         }
 
         let channel_tree = match guild.channels {
@@ -60,6 +60,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         };
 
         log_channels(channel_tree, &roles, &token).await?;
+        log_roles(&guild.roles).await?;
 
         // let channels = fetch_guild_channels(id, token).await;
         // println!("{:#?}", channels);
@@ -103,7 +104,7 @@ async fn construct_channel_tree(channels: Vec<Channel>) -> Result<HashMap<String
 async fn log_channels(channels: HashMap<String, ChannelTree>, roles: &HashMap<String, Role>, token: &String) -> Result<(), Box<dyn std::error::Error>> {
     let mut members = HashMap::<String, GuildMember>::new();
 
-    println!("{} channels", channels.len());
+    println!("{} channel groups", channels.len());
     for channel_tree in channels.values() {
         match &channel_tree.channel {
             Some(channel) => {
@@ -163,6 +164,17 @@ async fn log_channel(indentation: u32, channel: &Channel, roles: &HashMap<String
         }
         None => {}
     };
+
+    Ok(())
+}
+
+async fn log_roles(roles: &Vec<Role>) -> Result<(), Box<dyn std::error::Error>> {
+    let mut roles = roles.clone();
+    println!("{} roles", roles.len());
+    roles.sort_by(|a, b| a.position.cmp(&b.position));
+    for role in roles {
+        println!("{}[{}:{}] Color:{:#X} Hoist:{} Managed:{} Mentionable:{} Perms:{}", role.name, role.position, role.id, role.color, role.hoist, role.managed, role.mentionable, role.permissions_new);
+    }
 
     Ok(())
 }

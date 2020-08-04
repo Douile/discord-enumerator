@@ -10,7 +10,7 @@ struct Role {
     name: String,
     color: u32,
     hoist: bool,
-    position: u8,
+    position: u16,
     permissions: u32,
     permissions_new: String,
     managed: bool,
