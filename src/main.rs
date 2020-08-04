@@ -281,7 +281,19 @@ impl std::error::Error for DiscordError {
     }
 }
 
+struct ChannelTree {
+    channel: Option<Channel>,
+    children: HashMap<String, Channel>
+}
+
+impl ChannelTree {
+    fn new(channel: Option<Channel>) -> ChannelTree {
+        ChannelTree { channel: channel, children: HashMap::<String, Channel>::new() }
+    }
+}
+
 static USER_AGENT: &'static str = "Reqwest/0.10 DiscordEnumerator/0.1";
+static NO_TOPIC: &'static str = "No topic";
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -313,69 +325,122 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             roles.insert(role.clone().id, role);
         }
 
-        let mut members = HashMap::<String,GuildMember>::new();
-
-        match guild.channels {
+        let channel_tree = match guild.channels {
             Some(channels) => {
-                log_channels(channels, roles, &token).await?;
+                //log_channels(channels, roles, &token).await?;
+                construct_channel_tree(channels).await?
             }
             None => {
-                log_channels(fetch_guild_channels(&id, &token).await?, roles, &token).await?;
+                //log_channels(fetch_guild_channels(&id, &token).await?, roles, &token).await?;
+                construct_channel_tree(fetch_guild_channels(&id, &token).await?).await?
             }
-        }
+        };
+
+        log_channels(channel_tree, &roles, &token).await?;
 
         // let channels = fetch_guild_channels(id, token).await;
         // println!("{:#?}", channels);
     }
+
     Ok(())
 }
 
-async fn log_channels(channels: Vec<Channel>, roles: HashMap<String, Role>, token: &String) -> Result<(), Box<dyn std::error::Error>> {
-    let mut members = HashMap::<String, GuildMember>::new();
-
-    println!("{} channels", channels.len());
+async fn construct_channel_tree(channels: Vec<Channel>) -> Result<HashMap<String, ChannelTree>, Box<dyn std::error::Error>> {
+    let mut root = HashMap::<String, ChannelTree>::new();
     for channel in channels {
-        println!("#{} [{}] - {:#?}", channel.name, channel.id, channel.topic.unwrap_or_else(|| String::from("No topic")));
-        match channel.permission_overwrites {
-            Some(permissions) => {
-                let guild_id: String = match channel.guild_id {
-                    Some(guild_id) => guild_id,
-                    None => String::from("None")
-                };
-                for permission in permissions {
-                    match permission.r#type.as_str() {
-                        "member" => {
-                            match members.get(&permission.id) {
-                                Some(member) => println!("\tUser[{}.{}] Allow: {} Deny: {}", permission.clone().id, member.get_user().username, permission.allow_new, permission.deny_new),
-                                None => {
-                                    let result = fetch_guild_member(&guild_id, &permission.id, &token).await;
-                                    match result {
-                                        Ok(member) => {
-                                            members.insert(permission.clone().id, member.clone());
-                                            println!("\tUser[{}.{}] Allow: {} Deny: {}", permission.clone().id, member.get_user().username, permission.allow_new, permission.deny_new);
-                                        }
-                                        Err(e) => {
-                                            println!("Error fetching user: {:#?}", e);
-                                            println!("\tUser[{}] Allow: {} Deny: {}", permission.clone().id, permission.allow_new, permission.deny_new)
-                                        }
-                                    }
-                                }
-                            }
-
-                        },
-                        "role" => {
-                            match roles.get(&permission.id) {
-                                Some(role) => println!("\tRole[{}.{}] Allow: {} Deny: {}", role.id, role.name, permission.allow_new, permission.deny_new),
-                                None => println!("\tRole[{}] Allow: {} Deny: {}", permission.id, permission.allow_new, permission.deny_new)
-                            }
-                        },
-                        _ => println!("\tUnknown[{}] Allow: {} Deny: {}", permission.id, permission.allow_new, permission.deny_new)
+        match channel.clone().parent_id {
+            Some(parent_id) => {
+                match root.get_mut(&parent_id) {
+                    Some(parent) => {
+                        parent.children.insert(channel.clone().id, channel);
+                    },
+                    None => {
+                        let mut parent = ChannelTree::new(None);
+                        parent.children.insert(channel.clone().id, channel);
+                        root.insert(parent_id, parent);
                     }
                 }
             }
-            None => {}
+            None => {
+                match root.get_mut(&channel.id) {
+                    Some(node) => {
+                        node.channel.replace(channel);
+                    }
+                    None => {
+                        root.insert(channel.clone().id, ChannelTree::new(Some(channel)));
+                    }
+                }
+            }
         }
     }
+
+    Ok(root)
+}
+
+async fn log_channels(channels: HashMap<String, ChannelTree>, roles: &HashMap<String, Role>, token: &String) -> Result<(), Box<dyn std::error::Error>> {
+    let mut members = HashMap::<String, GuildMember>::new();
+
+    println!("{} channels", channels.len());
+    for channel_tree in channels.values() {
+        match &channel_tree.channel {
+            Some(channel) => {
+                log_channel(0, &channel, roles, &mut members, token).await?;
+            }
+            None => {
+                println!("Dead parent");
+            }
+        }
+        for channel_child in channel_tree.children.values() {
+            log_channel(1, &channel_child, roles, &mut members, token).await?;
+        }
+
+    }
+    Ok(())
+}
+
+async fn log_channel(indentation: u32, channel: &Channel, roles: &HashMap<String, Role>, members: &mut HashMap<String, GuildMember>, token: &String) -> Result<(), Box<dyn std::error::Error>> {
+    println!("{}#{} [{}] - {:#?}", calc_indentation(indentation), channel.name, channel.id, channel.topic.as_ref().unwrap_or(&NO_TOPIC.to_string()));
+    let inner_indent = calc_indentation(indentation+1);
+    match &channel.permission_overwrites {
+        Some(permissions) => {
+            let guild_id: String = match &channel.guild_id {
+                Some(guild_id) => guild_id.to_string(),
+                None => String::from("None")
+            };
+            for permission in permissions {
+                match permission.r#type.as_str() {
+                    "member" => {
+                        match members.get(&permission.id) {
+                            Some(member) => println!("{}User[{}.{}] Allow: {} Deny: {}", &inner_indent, permission.clone().id, member.get_user().username, permission.allow_new, permission.deny_new),
+                            None => {
+                                let result = fetch_guild_member(&guild_id, &permission.id, &token).await;
+                                match result {
+                                    Ok(member) => {
+                                        members.insert(permission.clone().id, member.clone());
+                                        println!("{}User[{}.{}] Allow: {} Deny: {}", &inner_indent, permission.clone().id, member.get_user().username, permission.allow_new, permission.deny_new);
+                                    }
+                                    Err(e) => {
+                                        println!("Error fetching user: {:#?}", e);
+                                        println!("{}User[{}] Allow: {} Deny: {}", &inner_indent, permission.clone().id, permission.allow_new, permission.deny_new)
+                                    }
+                                }
+                            }
+                        }
+
+                    },
+                    "role" => {
+                        match roles.get(&permission.id) {
+                            Some(role) => println!("{}Role[{}.{}] Allow: {} Deny: {}", &inner_indent, role.id, role.name, permission.allow_new, permission.deny_new),
+                            None => println!("{}Role[{}] Allow: {} Deny: {}", &inner_indent, permission.id, permission.allow_new, permission.deny_new)
+                        }
+                    },
+                    _ => println!("{}Unknown[{}] Allow: {} Deny: {}", &inner_indent, permission.id, permission.allow_new, permission.deny_new)
+                }
+            }
+        }
+        None => {}
+    };
+
     Ok(())
 }
 
@@ -427,5 +492,20 @@ async fn fetch_guild_member(guild_id: &String, user_id: &String, token: &String)
     } else {
         let err = response.json::<DiscordError>().await?;
         Err(Box::new(err))
+    }
+}
+
+fn calc_indentation(i: u32) -> String {
+    if i == 0 {
+        String::new()
+    } else if i == 1 {
+        String::from("├ ")
+    } else {
+        let mut res = String::new();
+        for _ in 1..i {
+            res.push_str("  ");
+        }
+        res.push_str("├ ");
+        res
     }
 }
