@@ -335,7 +335,7 @@ async fn log_channels(channels: Vec<Channel>, roles: HashMap<String, Role>, toke
 
     println!("{} channels", channels.len());
     for channel in channels {
-        println!("#{} [{}] - {:#?}", channel.name, channel.id, channel.topic);
+        println!("#{} [{}] - {:#?}", channel.name, channel.id, channel.topic.unwrap_or_else(|| String::from("No topic")));
         match channel.permission_overwrites {
             Some(permissions) => {
                 let guild_id: String = match channel.guild_id {
