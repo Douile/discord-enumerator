@@ -1,5 +1,3 @@
-#[macro_use]
-
 use serde::{Deserialize, Serialize};
 
 use crate::structs::User::User;
