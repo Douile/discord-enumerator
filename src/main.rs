@@ -123,7 +123,7 @@ async fn log_channels(channels: HashMap<String, ChannelTree>, roles: &HashMap<St
 }
 
 async fn log_channel(indentation: u32, channel: &Channel, roles: &HashMap<String, Role>, members: &mut HashMap<String, GuildMember>, token: &String) -> Result<(), Box<dyn std::error::Error>> {
-    println!("{}#{} [{}] - {:#?}", calc_indentation(indentation), channel.name, channel.id, channel.topic.as_ref().unwrap_or(&NO_TOPIC.to_string()));
+    println!("{}{}{} [{}] - {:#?}", calc_indentation(indentation), channel.r#type.to_string(), channel.name, channel.id, channel.topic.as_ref().unwrap_or(&NO_TOPIC.to_string()));
     let inner_indent = calc_indentation(indentation+1);
     match &channel.permission_overwrites {
         Some(permissions) => {

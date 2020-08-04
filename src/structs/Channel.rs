@@ -16,6 +16,34 @@ pub enum ChannelType {
     GUILD_NEWS = 5,
     GUILD_STORE = 6
 }
+impl ChannelType {
+    pub fn to_string(&self) -> String {
+        let mut res = String::new();
+        match &self {
+            ChannelType::GUILD_TEXT => {}
+            ChannelType::DM => {
+                res.push_str("DM");
+            }
+            ChannelType::GUILD_VOICE => {
+                res.push_str("V");
+            }
+            ChannelType::GROUP_DM => {
+                res.push_str("GDM");
+            }
+            ChannelType::GUILD_CATEGORY => {
+                res.push_str("CAT");
+            }
+            ChannelType::GUILD_NEWS => {
+                res.push_str("NEWS");
+            }
+            ChannelType::GUILD_STORE => {
+                res.push_str("STORE");
+            }
+        }
+        res.push('#');
+        return res;
+    }
+}
 
 pub_fields! {
 #[derive(Serialize)]
