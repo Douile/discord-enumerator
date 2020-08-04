@@ -1,0 +1,13 @@
+pub mod Activity;
+pub mod Channel;
+pub mod ChannelTree;
+pub mod ClientStatus;
+pub mod DiscordError;
+pub mod Emoji;
+pub mod Guild;
+pub mod GuildMember;
+pub mod PermissionOverwrite;
+pub mod Presence;
+pub mod Role;
+pub mod User;
+pub mod VoiceState;
