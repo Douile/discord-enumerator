@@ -14,6 +14,7 @@ use crate::structs::DiscordError::DiscordError;
 use crate::structs::Guild::Guild;
 use crate::structs::GuildMember::GuildMember;
 use crate::structs::Role::Role;
+use crate::structs::Emoji::Emoji;
 
 static USER_AGENT: &'static str = "Reqwest/0.10 DiscordEnumerator/0.1";
 static NO_TOPIC: &'static str = "No topic";
@@ -61,6 +62,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         log_channels(channel_tree, &roles, &token).await?;
         log_roles(&guild.roles).await?;
+        log_emojis(&guild.emojis).await?;
 
         // let channels = fetch_guild_channels(id, token).await;
         // println!("{:#?}", channels);
@@ -174,6 +176,15 @@ async fn log_roles(roles: &Vec<Role>) -> Result<(), Box<dyn std::error::Error>> 
     roles.sort_by(|a, b| a.position.cmp(&b.position));
     for role in roles {
         println!("{}[{}:{}] Color:{:#X} Hoist:{} Managed:{} Mentionable:{} Perms:{}", role.name, role.position, role.id, role.color, role.hoist, role.managed, role.mentionable, role.permissions_new);
+    }
+
+    Ok(())
+}
+
+async fn log_emojis(emojis: &Vec<Emoji>) -> Result<(), Box<dyn std::error::Error>> {
+    let emojis = emojis.clone();
+    for emoji in emojis {
+        println!("Emoji <{}:{}>", emoji.name.unwrap_or(String::from("No name")), emoji.id.unwrap_or(String::from("No ID")));
     }
 
     Ok(())
