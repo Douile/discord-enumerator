@@ -35,10 +35,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         i += 1;
     }
 
-    println!("Token:\"{}\" Guild:\"{}\"", token, id);
+    eprintln!("Token:\"{}\" Guild:\"{}\"", token, id);
 
     if i < 3 {
-        println!("Not enough args");
+        eprintln!("Not enough args you must provide a token and ID");
     } else {
         let guild = fetch_guild(&id, &token).await?;
         // println!("{:#?}", guild);
