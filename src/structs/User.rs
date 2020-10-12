@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+use crate::traits::Snowflake::Snowflake;
+
 pub_fields! {
 #[derive(Serialize)]
 #[derive(Deserialize)]
@@ -29,5 +31,11 @@ impl User {
             avatar: None, bot: None, system: None, mfa_enabled: None, locale: None, verified: None,
             email: None, flags: None, premium_type: None, public_flags: None
          }
+    }
+}
+
+impl Snowflake for User {
+    fn snowflake(&self) -> u64 {
+        return self.id.parse::<u64>().unwrap_or(0);
     }
 }

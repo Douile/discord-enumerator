@@ -7,6 +7,8 @@ use crate::structs::Presence::Presence;
 use crate::structs::Role::Role;
 use crate::structs::VoiceState::VoiceState;
 
+use crate::traits::Snowflake::Snowflake;
+
 pub_fields! {
 #[derive(Serialize)]
 #[derive(Deserialize)]
@@ -61,4 +63,10 @@ struct Guild {
     approximate_member_count: Option<u32>,
     approximate_presence_count: Option<u32>,
 }
+}
+
+impl Snowflake for Guild {
+    fn snowflake(&self) -> u64 {
+        return self.id.parse::<u64>().unwrap_or(0);
+    }
 }

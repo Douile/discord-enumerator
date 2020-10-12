@@ -1,5 +1,6 @@
 extern crate reqwest;
 extern crate tokio;
+extern crate chrono;
 
 use std::collections::HashMap;
 use std::env;
@@ -8,10 +9,12 @@ use std::env;
 mod macros;
 
 mod structs;
+mod traits;
 use crate::structs::Channel::Channel;
 use crate::structs::ChannelTree::ChannelTree;
 use crate::structs::DiscordError::DiscordError;
 use crate::structs::Guild::Guild;
+use crate::traits::Snowflake::Snowflake;
 use crate::structs::GuildMember::GuildMember;
 use crate::structs::Role::Role;
 use crate::structs::Emoji::Emoji;
@@ -42,7 +45,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     } else {
         let guild = fetch_guild(&id, &token).await?;
         // println!("{:#?}", guild);
-        println!("{} [{}] {}", guild.name, guild.id, guild.region);
+        let created = guild.created_datetime();
+        let createdDate = created.format("%Y-%m-%d %H:%M:%S");
+
+        println!("{} [{}] {} created: {}", guild.name, guild.id, guild.region, createdDate);
+        match guild.members {
+            Some(members) => {
+                println!("{} members", members.len());
+            }
+            None => {
+                eprintln!("Couldn't count members");
+            }
+        }
 
         let mut roles = HashMap::<String, Role>::new();
         for role in &guild.roles {
@@ -125,7 +139,12 @@ async fn log_channels(channels: HashMap<String, ChannelTree>, roles: &HashMap<St
 }
 
 async fn log_channel(indentation: u32, channel: &Channel, roles: &HashMap<String, Role>, members: &mut HashMap<String, GuildMember>, token: &String) -> Result<(), Box<dyn std::error::Error>> {
-    println!("{}{}{} [{}] - {:#?}", calc_indentation(indentation), channel.r#type.to_string(), channel.name, channel.id, channel.topic.as_ref().unwrap_or(&NO_TOPIC.to_string()));
+    println!("{}{}{} [{}] - {:#?} {}",
+        calc_indentation(indentation),
+        channel.r#type.to_string(),
+        channel.name, channel.id, channel.topic.as_ref().unwrap_or(&NO_TOPIC.to_string()),
+        channel.created_datetime().format("%Y-%m-%d %H:%M:%S")
+    );
     let inner_indent = calc_indentation(indentation+1);
     match &channel.permission_overwrites {
         Some(permissions) => {
@@ -172,10 +191,20 @@ async fn log_channel(indentation: u32, channel: &Channel, roles: &HashMap<String
 
 async fn log_roles(roles: &Vec<Role>) -> Result<(), Box<dyn std::error::Error>> {
     let mut roles = roles.clone();
-    println!("{} roles", roles.len());
+    println!("#{} roles", roles.len());
     roles.sort_by(|a, b| a.position.cmp(&b.position));
     for role in roles {
-        println!("{}[{}:{}] Color:{:#X} Hoist:{} Managed:{} Mentionable:{} Perms:{}", role.name, role.position, role.id, role.color, role.hoist, role.managed, role.mentionable, role.permissions_new);
+        println!("{}[{}:{}] Color:{:#X} Hoist:{} Managed:{} Mentionable:{} Perms:{} Created: {}",
+            role.name,
+            role.position,
+            role.id,
+            role.color,
+            role.hoist,
+            role.managed,
+            role.mentionable,
+            role.permissions_new,
+            role.created_datetime().format("%Y-%m-%d %H:%M:%S")
+        );
     }
 
     Ok(())
@@ -183,8 +212,13 @@ async fn log_roles(roles: &Vec<Role>) -> Result<(), Box<dyn std::error::Error>> 
 
 async fn log_emojis(emojis: &Vec<Emoji>) -> Result<(), Box<dyn std::error::Error>> {
     let emojis = emojis.clone();
+    println!("#{} emojis", emojis.len());
     for emoji in emojis {
-        println!("Emoji <{}:{}>", emoji.name.unwrap_or(String::from("No name")), emoji.id.unwrap_or(String::from("No ID")));
+        println!("Emoji <{}:{}> {}",
+            emoji.name_safe(String::from("No name")),
+            emoji.id_safe(String::from("No ID")),
+            emoji.created_datetime().format("%Y-%m-%d %H:%M:%S")
+        );
     }
 
     Ok(())

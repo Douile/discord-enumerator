@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+use crate::traits::Snowflake::Snowflake;
+
 pub_fields! {
 #[derive(Serialize)]
 #[derive(Deserialize)]
@@ -16,4 +18,10 @@ struct Role {
     managed: bool,
     mentionable: bool,
 }
+}
+
+impl Snowflake for Role {
+    fn snowflake(&self) -> u64 {
+        return self.id.parse::<u64>().unwrap_or(0);
+    }
 }

@@ -3,6 +3,7 @@ use serde_repr::{Deserialize_repr, Serialize_repr};
 
 use crate::structs::PermissionOverwrite::PermissionOverwrite;
 use crate::structs::User::User;
+use crate::traits::Snowflake::Snowflake;
 
 #[derive(Serialize_repr, Deserialize_repr, PartialEq, Debug, Clone)]
 #[repr(u8)]
@@ -70,4 +71,10 @@ struct Channel {
     parent_id: Option<String>,
     last_pin_timestamp: Option<String>,
 }
+}
+
+impl Snowflake for Channel {
+    fn snowflake(&self) -> u64 {
+        return self.id.parse::<u64>().unwrap_or(0);
+    }
 }
